@@ -2,15 +2,17 @@ import pytest
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
+from django.urls import reverse
 from .models import BreakInterval
+
+
+@pytest.fixture
+def user(db):
+    return User.objects.create_user(username='test_user', password='pass123')
 
 
 @pytest.mark.django_db
 class TestBreakIntervalModel:
-
-    @pytest.fixture
-    def user(self, db):
-        return User.objects.create_user(username='test_user', password='pass123')
 
     def test_break_interval_creation(self, user):
         interval = BreakInterval.objects.create(user=user)
@@ -40,3 +42,33 @@ class TestBreakIntervalModel:
         user.delete()
 
         assert not BreakInterval.objects.filter(user_id=user.id).exists()
+
+
+@pytest.mark.django_db
+class TestAuth:
+
+    def test_register(self, client):
+        response = client.post(reverse("register"), {
+            "username": "test_username",
+            "password1": "testpass11",
+            "password2": "testpass11"})
+
+        assert response.status_code == 302
+        assert response.url == reverse("login")
+
+    def test_login(self, client, user):
+        response = client.post(reverse("login"), {
+            "username": "test_user",
+            "password": "pass123"
+        })
+
+        assert response.status_code == 200
+        assert b"Login successful!" in response.content
+
+    def test_logout(self, client, user):
+        assert client.login(username="test_user", password="pass123")
+
+        response = client.post(reverse("logout"))
+
+        assert response.status_code == 200
+        assert b"Logout successful!" in response.content
