@@ -3,6 +3,12 @@ from django.contrib.auth import login, logout
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
 
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+
+from .models import BreakInterval
+from .serializers import BreakIntervalSerializer
+
 
 def register_view(request):
     if request.method == "POST":
@@ -32,3 +38,14 @@ def login_view(request):
 def logout_view(request):
     logout(request)
     return HttpResponse("Logout successful!")
+
+
+class BreakIntervalViewSet(viewsets.ModelViewSet):
+    serializer_class = BreakIntervalSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return BreakInterval.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)

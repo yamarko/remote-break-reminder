@@ -3,12 +3,21 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.urls import reverse
+from rest_framework.test import APIClient
 from .models import BreakInterval
 
 
 @pytest.fixture
 def user(db):
     return User.objects.create_user(username='test_user', password='pass123')
+
+
+@pytest.fixture
+def authenticated_client(user):
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    return client
 
 
 @pytest.mark.django_db
@@ -72,3 +81,50 @@ class TestAuth:
 
         assert response.status_code == 200
         assert b"Logout successful!" in response.content
+
+
+@pytest.mark.django_db
+class TestBreakIntervalAPI:
+
+    def test_get_interval(self, authenticated_client, user):
+        BreakInterval.objects.create(user=user)
+
+        response = authenticated_client.get(
+            reverse("break-interval-detail", kwargs={"pk": user.breakinterval.pk})
+        )
+
+        assert response.status_code == 200
+        assert response.data["interval_minutes"] == 60
+
+    def test_create_interval(self, authenticated_client, user):
+        data = {"interval_minutes": 90}
+
+        response = authenticated_client.post(reverse("break-interval-list"), data)
+
+        assert response.status_code == 201
+        assert BreakInterval.objects.count() == 1
+        assert BreakInterval.objects.first().user == user
+
+    def test_partial_update_interval(self, authenticated_client, user):
+        BreakInterval.objects.create(user=user)
+        partial_data = {"interval_minutes": 75}
+
+        response = authenticated_client.patch(
+            reverse("break-interval-detail", kwargs={"pk": user.breakinterval.pk}),
+            partial_data,
+        )
+
+        assert response.status_code == 200
+
+        user.breakinterval.refresh_from_db()
+        assert user.breakinterval.interval_minutes == 75
+
+    def test_delete_interval(self, authenticated_client, user):
+        BreakInterval.objects.create(user=user)
+
+        response = authenticated_client.delete(
+            reverse("break-interval-detail", kwargs={"pk": user.breakinterval.pk})
+        )
+
+        assert response.status_code == 204
+        assert BreakInterval.objects.count() == 0
