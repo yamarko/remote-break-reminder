@@ -6,8 +6,8 @@ from django.http import HttpResponse
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 
-from .models import BreakInterval
-from .serializers import BreakIntervalSerializer
+from .models import BreakInterval, BreakLog
+from .serializers import BreakIntervalSerializer, BreakLogSerializer
 
 
 def register_view(request):
@@ -49,3 +49,16 @@ class BreakIntervalViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+
+class BreakLoglViewSet(viewsets.ModelViewSet):
+    serializer_class = BreakLogSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return BreakLog.objects.filter(user=self.request.user).order_by('-triggered_at')
+
+
+def dashboard_view(request):
+    logs = BreakLog.objects.filter(user=request.user).order_by('-triggered_at')[:5]
+    return render(request, 'dashboard.html', {'break_logs': logs})

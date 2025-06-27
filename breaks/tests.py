@@ -152,3 +152,29 @@ class TestBreakReminderTasks:
         check_and_schedule_breaks()
 
         mock_delay.assert_called_once_with(user.id)
+
+
+@pytest.mark.django_db
+class TestLastBreakLogsAPI:
+
+    endpoint = reverse('break-log-list')
+
+    def test_auth_required(self, client):
+        response = client.get(self.endpoint)
+        assert response.status_code == 403
+
+    def test_all_breaks_ordered(self, authenticated_client, user):
+        for i in range(6):
+            BreakLog.objects.create(user=user)
+
+        response = authenticated_client.get(self.endpoint)
+        assert response.status_code == 200
+        assert len(response.data) == 6
+
+        times = [log['triggered_at'] for log in response.data]
+        assert times == sorted(times, reverse=True)
+
+    def test_no_breaks(self, authenticated_client):
+        response = authenticated_client.get(self.endpoint)
+        assert response.status_code == 200
+        assert response.data == []

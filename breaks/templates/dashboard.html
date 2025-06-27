@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Break Tracking Dashboard</title>
+</head>
+<body>
+    <h1>Your Last 5 Breaks</h1>
+
+    {% if break_logs %}
+        <ul>
+            {% for log in break_logs %}
+                <li>
+                    {{ log.triggered_at }}
+                    ({{ log.triggered_at|timesince }} ago)
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No breaks recorded yet.</p>
+    {% endif %}
+</body>
+</html>
