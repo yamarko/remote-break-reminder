@@ -14,3 +14,11 @@ class BreakInterval(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - every {self.interval_minutes} min"
+
+
+class BreakLog(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    triggered_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} - break at {self.triggered_at}"

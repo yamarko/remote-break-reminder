@@ -4,12 +4,17 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.urls import reverse
 from rest_framework.test import APIClient
-from .models import BreakInterval
+from unittest.mock import patch
+from .models import BreakInterval, BreakLog
+from breaks.tasks import send_break_reminder, check_and_schedule_breaks
 
 
 @pytest.fixture
 def user(db):
-    return User.objects.create_user(username='test_user', password='pass123')
+    return User.objects.create_user(
+        username="test_user",
+        email="test@example.com",
+        password="pass123")
 
 
 @pytest.fixture
@@ -20,11 +25,16 @@ def authenticated_client(user):
     return client
 
 
+@pytest.fixture
+def create_interval(user):
+    return BreakInterval.objects.create(user=user)
+
+
 @pytest.mark.django_db
 class TestBreakIntervalModel:
 
-    def test_break_interval_creation(self, user):
-        interval = BreakInterval.objects.create(user=user)
+    def test_break_interval_creation(self, create_interval):
+        interval = create_interval
 
         assert interval.pk is not None
         assert interval.interval_minutes == 60
@@ -38,14 +48,11 @@ class TestBreakIntervalModel:
             with pytest.raises(ValidationError):
                 interval.full_clean()
 
-    def test_unique_user_constraint(self, user):
-        BreakInterval.objects.create(user=user)
-
+    def test_unique_user_constraint(self, user, create_interval):
         with pytest.raises(IntegrityError):
             BreakInterval.objects.create(user=user, interval_minutes=30)
 
-    def test_user_deletion_cascades(self, user):
-        BreakInterval.objects.create(user=user)
+    def test_user_deletion_cascades(self, user, create_interval):
         assert BreakInterval.objects.filter(user=user).exists()
 
         user.delete()
@@ -86,9 +93,7 @@ class TestAuth:
 @pytest.mark.django_db
 class TestBreakIntervalAPI:
 
-    def test_get_interval(self, authenticated_client, user):
-        BreakInterval.objects.create(user=user)
-
+    def test_get_interval(self, authenticated_client, user, create_interval):
         response = authenticated_client.get(
             reverse("break-interval-detail", kwargs={"pk": user.breakinterval.pk})
         )
@@ -105,8 +110,7 @@ class TestBreakIntervalAPI:
         assert BreakInterval.objects.count() == 1
         assert BreakInterval.objects.first().user == user
 
-    def test_partial_update_interval(self, authenticated_client, user):
-        BreakInterval.objects.create(user=user)
+    def test_partial_update_interval(self, authenticated_client, user, create_interval):
         partial_data = {"interval_minutes": 75}
 
         response = authenticated_client.patch(
@@ -119,12 +123,32 @@ class TestBreakIntervalAPI:
         user.breakinterval.refresh_from_db()
         assert user.breakinterval.interval_minutes == 75
 
-    def test_delete_interval(self, authenticated_client, user):
-        BreakInterval.objects.create(user=user)
-
+    def test_delete_interval(self, authenticated_client, user, create_interval):
         response = authenticated_client.delete(
             reverse("break-interval-detail", kwargs={"pk": user.breakinterval.pk})
         )
 
         assert response.status_code == 204
         assert BreakInterval.objects.count() == 0
+
+
+@pytest.mark.django_db
+class TestBreakReminderTasks:
+
+    @patch("breaks.tasks.send_mail")
+    def test_send_reminder(self, mock_send, user, create_interval):
+        send_break_reminder(user.id)
+
+        assert BreakLog.objects.filter(user=user).exists()
+        mock_send.assert_called_once()
+
+    @patch("breaks.tasks.logger")
+    def test_send_reminder_invalid_user(self, mock_logger):
+        send_break_reminder(9999)
+        mock_logger.error.assert_called_once_with("User with ID 9999 does not exist.")
+
+    @patch("breaks.tasks.send_break_reminder.delay")
+    def test_check_and_trigger(self, mock_delay, user, create_interval):
+        check_and_schedule_breaks()
+
+        mock_delay.assert_called_once_with(user.id)
