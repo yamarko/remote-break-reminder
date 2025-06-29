@@ -8,7 +8,7 @@ from django.core.mail import send_mail
 from django.utils import timezone
 
 from .models import BreakInterval, BreakLog
-from .utils import get_reminder_content
+from .utils import get_reminder_content, fetch_inspirational_quote
 
 
 logger = logging.getLogger(__name__)
@@ -30,6 +30,10 @@ def send_break_reminder(user_id):
         logger.error(f"Failed to load reminder content, using fallback: {e}")
         subject = "Time for a break!"
         message = "Hey! Take a few minutes to stretch or rest."
+
+    quote = fetch_inspirational_quote()
+    if quote:
+        message += f"\n\n{quote}"
 
     send_mail(
         subject=subject,

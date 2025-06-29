@@ -7,7 +7,7 @@ from rest_framework.test import APIClient
 from unittest.mock import patch
 from .models import BreakInterval, BreakLog
 from breaks.tasks import send_break_reminder, check_and_schedule_breaks
-from breaks.utils import get_reminder_content
+from breaks.utils import get_reminder_content, fetch_inspirational_quote
 
 
 @pytest.fixture
@@ -184,3 +184,31 @@ class TestLastBreakLogsAPI:
         response = authenticated_client.get(self.endpoint)
         assert response.status_code == 200
         assert response.data == []
+
+
+class TestQuoteFetching:
+
+    @patch("breaks.utils.requests.get")
+    def test_fetch_quote_success(self, mock_get):
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = [
+            {"q": "Stay hungry, stay foolish.", "a": "Steve Jobs"}
+        ]
+
+        quote = fetch_inspirational_quote()
+        assert quote == '"Stay hungry, stay foolish." - Steve Jobs'
+
+    @patch("breaks.utils.requests.get")
+    def test_fetch_quote_invalid_data(self, mock_get):
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = [{}]
+
+        quote = fetch_inspirational_quote()
+        assert quote is None
+
+    @patch("breaks.utils.requests.get")
+    def test_fetch_quote_failure(self, mock_get):
+        mock_get.side_effect = Exception("API error")
+
+        quote = fetch_inspirational_quote()
+        assert quote is None
