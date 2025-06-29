@@ -9,6 +9,8 @@ from rest_framework.permissions import IsAuthenticated
 from .models import BreakInterval, BreakLog
 from .serializers import BreakIntervalSerializer, BreakLogSerializer
 
+from datetime import timedelta
+
 
 def register_view(request):
     if request.method == "POST":
@@ -60,5 +62,23 @@ class BreakLoglViewSet(viewsets.ModelViewSet):
 
 
 def dashboard_view(request):
-    logs = BreakLog.objects.filter(user=request.user).order_by('-triggered_at')[:5]
-    return render(request, 'dashboard.html', {'break_logs': logs})
+    logs_qs = BreakLog.objects.filter(user=request.user)
+    logs = logs_qs.order_by('-triggered_at')[:5]
+    total_breaks = logs_qs.count()
+
+    interval = BreakInterval.objects.filter(user=request.user).first()
+    last_break = logs.first() if interval else None
+
+    if interval and last_break:
+        next_break = last_break.triggered_at + timedelta(minutes=interval.interval_minutes)
+    else:
+        next_break = None
+
+    context = {
+        'break_logs': logs,
+        'total_breaks': total_breaks,
+        'next_break': next_break,
+        'username': request.user.get_full_name() or request.user.username,
+    }
+
+    return render(request, 'dashboard.html', context)

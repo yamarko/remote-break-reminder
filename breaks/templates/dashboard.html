@@ -6,8 +6,10 @@
     <title>Break Tracking Dashboard</title>
 </head>
 <body>
-    <h1>Your Last 5 Breaks</h1>
+    <h1>Break Tracking Dashboard</h1>
+    <h2>Welcome, {{ username }}!</h2>
 
+    <p>Your last 5 breaks:</p>
     {% if break_logs %}
         <ul>
             {% for log in break_logs %}
@@ -19,6 +21,12 @@
         </ul>
     {% else %}
         <p>No breaks recorded yet.</p>
+    {% endif %}
+    
+    <p>Total breaks taken: {{ total_breaks }}</p>
+
+    {% if next_break %}
+        <p>Next scheduled break: {{ next_break }}</p>
     {% endif %}
 </body>
 </html>
