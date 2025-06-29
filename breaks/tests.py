@@ -7,6 +7,7 @@ from rest_framework.test import APIClient
 from unittest.mock import patch
 from .models import BreakInterval, BreakLog
 from breaks.tasks import send_break_reminder, check_and_schedule_breaks
+from breaks.utils import get_reminder_content
 
 
 @pytest.fixture
@@ -152,6 +153,11 @@ class TestBreakReminderTasks:
         check_and_schedule_breaks()
 
         mock_delay.assert_called_once_with(user.id)
+
+    def test_get_reminder_content(self):
+        subject, message = get_reminder_content()
+        assert isinstance(subject, str) and subject
+        assert isinstance(message, str) and message
 
 
 @pytest.mark.django_db
