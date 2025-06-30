@@ -1,0 +1,54 @@
+services:
+  web:
+    build: .
+    container_name: remote_break_web
+    command: ./docker-entrypoint.sh
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    env_file:
+      - .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings
+      PYTHONDONTWRITEBYTECODE: 1
+      PYTHONUNBUFFERED: 1
+
+  redis:
+    image: redis:8
+    container_name: remote_break_redis
+    ports:
+      - "6379:6379"
+  
+  celery:
+    build: .
+    container_name: remote_break_celery
+    command: celery -A config worker --loglevel=info
+    working_dir: /app
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+    env_file:
+      - .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings
+
+  celery-beat:
+    build: .
+    container_name: remote_break_celery_beat
+    command: celery -A config beat --loglevel=info
+    working_dir: /app
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+    env_file:
+      - .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings
+
+volumes:
+  redis_data:
